@@ -32,14 +32,10 @@ class extractFrames(threading.Thread):
 
         while success:
             e1Sem.acquire()
-            print("Extract Acquired E1")
             b1Lock.acquire()
-            # write the current frame out as a jpeg image
-            #success, jpgImage = cv2.imencode('.jpg', image)
 
             #encode the frame as base 64 to make debugging easier
             frameQ.append(image)
-            print("length of frameQ = %d", len(frameQ))
 
             #read next image
             success,image = vidcap.read()
@@ -47,7 +43,9 @@ class extractFrames(threading.Thread):
             count += 1
             b1Lock.release()
             f1Sem.release()
-            print("Extract Released F1")
+        for i in range(10):
+            print("______________________________________________ Releasing f1 ", i)
+            f1Sem.release()
 
 
 class convertFrames(threading.Thread):
@@ -57,17 +55,18 @@ class convertFrames(threading.Thread):
     def run(self):
         countC = 0
         while True:
-            print("------------CONVERSION STARTED")
             f1Sem.acquire()
             e2Sem.acquire()
 
-            print("------------f1 acquired by convert")
+
             b1Lock.acquire()
             b2Lock.acquire()
-            print("------------b1 acquired")
 
             # get the next frame
-            frameAux = frameQ.pop()
+            if(frameQ):
+                frameAux = frameQ.pop()
+            else:
+                break
             #convert to grayscale
             grayscaleFrame = cv2.cvtColor(frameAux, cv2.COLOR_BGR2GRAY)
             # send to next queue
@@ -76,10 +75,16 @@ class convertFrames(threading.Thread):
             countC+=1
 
             b2Lock.release()
-
             b1Lock.release()
+
             f2Sem.release()
             e1Sem.release()
+        b2Lock.release()
+        b1Lock.release()
+        e1Sem.release()
+        for i in range(10):
+            print("------------f2 released ", i)
+            f2Sem.release()
 
 class displayFrames(threading.Thread):
     def __init__(self):
@@ -89,9 +94,13 @@ class displayFrames(threading.Thread):
         while True:
             f2Sem.acquire()
             b2Lock.acquire()
-            img=convQ.pop()
-            cv2.imshow("Video", img)
-            if cv2.waitKey(24) and 0xFF == ord("q"):
+            if (convQ):
+                img=convQ.pop()
+                cv2.imshow("Video", img)
+                if cv2.waitKey(24) and 0xFF == ord("q"):
+                    break
+            else:
+                print("DONE!!!!!!")
                 break
             b2Lock.release()
             e2Sem.release()
